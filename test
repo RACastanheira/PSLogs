@@ -23,6 +23,12 @@ foreach ($vm in $vms) {
 }  
 
 
+
+
+
+
+
+
 #vamos testar assim temos so o ipv4 o catch e o ler as vms da lista 
 
 # Import Excel module
@@ -64,6 +70,94 @@ foreach ($vm in $vms) {
 }
 
 # Show list of failed VMs
+if ($failedVMs.Count -gt 0) {
+    Write-Host "`n======================="
+    Write-Host "FAILED TO CONNECT TO:"
+    Write-Host "======================="
+    $failedVMs | ForEach-Object { Write-Host $_ }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Read all VMs from text file
+$vms = Get-Content -Path "C:\Path\To\VMList.txt"
+
+# Define your Linux VMs (you can also detect based on name or IP pattern)
+$linuxVMs = @("linux1", "192.168.1.50")  # Add Linux VM hostnames or IPs here
+
+# Prompt for credentials
+$windowsCred = Get-Credential -Message "Enter credentials for Windows VMs"
+$linuxCred = Get-Credential -Message "Enter credentials for Linux VMs (SSH)"
+
+# Track failed connections
+$failedVMs = @()
+
+foreach ($vm in $vms) {
+    if ($linuxVMs -contains $vm) {
+        try {
+            # Use SSH for Linux VMs
+            $linuxUsername = $linuxCred.UserName
+            $linuxPassword = $linuxCred.GetNetworkCredential().Password
+
+            # Example using plink.exe (PuTTY), or replace with ssh.exe if available
+            $command = "hostname; ip -4 addr show | grep inet | grep -v 127.0.0.1"
+            $sshOutput = & ssh "$linuxUsername@$vm" $command
+
+            Write-Host "----------------------"
+            Write-Host "Result from Linux VM $vm :"
+            Write-Host "----------------------"
+            Write-Host $sshOutput
+            Write-Host "----------------------`n"
+        }
+        catch {
+            Write-Warning "Could not retrieve info from Linux VM $vm"
+            $failedVMs += $vm
+        }
+    }
+    else {
+        try {
+            # Use WinRM for Windows VMs
+            $result = Invoke-Command -ComputerName $vm -ScriptBlock {
+                $hostname = hostname
+                $ipv4 = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+                    $_.IPAddress -ne "127.0.0.1" -and $_.InterfaceAlias -notmatch "Loopback"
+                }).IPAddress
+
+                return "Hostname: $hostname`nIPv4 Address(es): $($ipv4 -join ", ")"
+            } -Credential $windowsCred -ErrorAction Stop
+
+            Write-Host "----------------------"
+            Write-Host "Result from Windows VM $vm :"
+            Write-Host "----------------------"
+            Write-Host $result
+            Write-Host "----------------------`n"
+        }
+        catch {
+            Write-Warning "Could not retrieve info from Windows VM $vm"
+            $failedVMs += $vm
+        }
+    }
+}
+
+# Output failed VMs
 if ($failedVMs.Count -gt 0) {
     Write-Host "`n======================="
     Write-Host "FAILED TO CONNECT TO:"
