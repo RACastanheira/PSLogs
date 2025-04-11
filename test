@@ -1,8 +1,5 @@
 #vamos testar assim temos so o ipv4 o catch e o ler as vms da lista - this one worked
 
-# Import Excel module
-Import-Module ImportExcel
-
 # Read VMs from Excel
 $vms = Import-Excel -Path "C:\Path\To\VMList.xlsx" | Select-Object -ExpandProperty VMName
 
