@@ -1,4 +1,4 @@
-#Show memory usage and the top 5 processes using it, can also be used for multiple VMs
+#Show memory usage and the top 5 processes using it, can also be used for multiple VMs without the need to Login into said VM
 $remote_computer = Read-Host "Hostname ou Hostnames usar , " 
 
 $remote_computer = $remote_computer -split ','
@@ -39,7 +39,7 @@ foreach ($computer in $remote_computer) {
 
 
 
-#show you the Disk space of a VM
+#show you the Disk space of a VM without the need to Login into said VM
 param
 (
 	[Parameter(Position=0,mandatory=$true)]
@@ -89,7 +89,7 @@ $svc
 
 
 
-#In this situation i had to confirm if the elements, e-mails, still belonged to any of our AD domamins  
+#In this situation i had to confirm if the elements, e-mails, still belonged to any of our AD domamins  without the need to Login into said VM
 # Path to the CSV file with user data (make sure it has an 'Email' column)
 $csvFilePath = "C:\Users\myacc\test.csv"
 
@@ -160,7 +160,7 @@ $results | Format-Table -Property Email, Domain, Status
 
 
 
-#Here i had to identify to what WSUS server the VMs were in 
+#Here i had to identify to what WSUS server the VMs were in without the need to Login into said VM
 
 $reportReg = @()
 $Computers = Get-Content C:\tmp\servers1.txt #this was the path to the file where i listed the VMs i needed to check
@@ -206,3 +206,156 @@ get-Childitem "C:\Users" -Directory | ForEach-Object {
 		Write-host "Deleted $folderName for user $($_.Name)"
 	}
 }
+
+
+
+
+
+
+
+
+
+
+#Delete users in error from a VM  
+
+$userProfiles = Get-WmiObject -Class Win32_UserProfile
+ 
+foreach ($profile in $userProfiles) {
+   $userSID = $profile.SID
+   $userAccount = $null
+ 
+   # Try to get the user account associated with the profile
+   try {
+       $userAccount = [System.Security.Principal.SecurityIdentifier]::new($userSID).Translate([System.Security.Principal.NTAccount]).Value
+   } catch {
+       # An exception occurs when the user account doesn't exist
+   }
+ 
+   # Check if a user account was found
+   if ($userAccount -eq $null) {
+       # Delete the user profile
+       Write-Host "Deleting user profile with SID $userSID"
+       Remove-WmiObject -InputObject $profile
+   }
+}
+ 
+Write-Host "User profiles cleanup completed."
+
+
+#Clears space used by browsers 
+
+Write-Host -ForegroundColor yellow "#######################################################"
+""
+Write-Host -ForegroundColor Green "Powershell commands to delete cache & cookies in Firefox, Chrome & IE browsers"
+Write-Host -ForegroundColor Green "By Lee Bhogal, Paradise Computing Ltd - June 2014"
+Write-Host -ForegroundColor Green "VERSION: 2"
+""
+Write-Host -ForegroundColor yellow "#######################################################"
+""
+Write-Host -ForegroundColor Green "CHANGE_LOG:
+v2.4: - Resolved *.default issue, issue was with the file path name not with *.default, but issue resolved
+v2.3: - Added Cache2 to Mozilla directories but found that *.default is not working
+v2.2: - Added Cyan colour to verbose output
+v2.1: - Added the location 'C:\Windows\Temp\*' and 'C:\`$recycle.bin\'
+v2:   - Changed the retrieval of user list to dir the c:\users folder and export to csv
+v1:   - Compiled script"
+""
+Write-Host -ForegroundColor yellow "#######################################################"
+""
+#########################
+"-------------------"
+Write-Host -ForegroundColor Green "SECTION 1: Getting the list of users"
+"-------------------"
+# Write Information to the screen
+Write-Host -ForegroundColor yellow "Exporting the list of users to c:\users\%username%\users.csv"
+# List the users in c:\users and export to the local profile for calling later
+dir C:\Users | select Name | Export-Csv -Path C:\users\$env:USERNAME\users.csv -NoTypeInformation
+$list=Test-Path C:\users\$env:USERNAME\users.csv
+""
+#########################
+"-------------------"
+Write-Host -ForegroundColor Green "SECTION 2: Beginning Script..."
+"-------------------"
+if ($list) {
+  "-------------------"
+  #Clear Mozilla Firefox Cache
+  Write-Host -ForegroundColor Green "SECTION 3: Clearing Mozilla Firefox Caches"
+  "-------------------"
+  Write-Host -ForegroundColor yellow "Clearing Mozilla caches"
+  Write-Host -ForegroundColor cyan
+  Import-CSV -Path C:\users\$env:USERNAME\users.csv -Header Name | foreach {
+          Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\cache\* -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\cache\*.* -Recurse -Force -EA SilentlyContinue -Verbose
+  Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\cache2\entries\*.* -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\thumbnails\* -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\cookies.sqlite -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\webappsstore.sqlite -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path C:\Users\$($_.Name)\AppData\Local\Mozilla\Firefox\Profiles\*.default\chromeappsstore.sqlite -Recurse -Force -EA SilentlyContinue -Verbose
+          }
+  Write-Host -ForegroundColor yellow "Clearing Mozilla caches"
+  Write-Host -ForegroundColor yellow "Done..."
+  ""
+  "-------------------"
+  # Clear Google Chrome 
+  Write-Host -ForegroundColor Green "SECTION 4: Clearing Google Chrome Caches"
+  "-------------------"
+  Write-Host -ForegroundColor yellow "Clearing Google caches"
+  Write-Host -ForegroundColor cyan
+  Import-CSV -Path C:\users\$env:USERNAME\users.csv -Header Name | foreach {
+          Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Google\Chrome\User Data\Default\Cache\*" -Recurse -Force -EA SilentlyContinue -Verbose
+Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Google\Chrome\User Data\Default\Cache2\entries\*" -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Google\Chrome\User Data\Default\Cookies" -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Google\Chrome\User Data\Default\Media Cache" -Recurse -Force -EA SilentlyContinue -Verbose
+          Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Google\Chrome\User Data\Default\Cookies-Journal" -Recurse -Force -EA SilentlyContinue -Verbose
+          # Comment out the following line to remove the Chrome Write Font Cache too.
+          # Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Google\Chrome\User Data\Default\ChromeDWriteFontCache" -Recurse -Force -EA SilentlyContinue -Verbose
+          }
+ 
+  Write-Host -ForegroundColor yellow "Done..."
+  ""
+  "-------------------"
+  # Clear Internet Explorer
+  Write-Host -ForegroundColor Green "SECTION 5: Clearing Internet Explorer Caches"
+   "-------------------"
+  Write-Host -ForegroundColor yellow "Clearing Google caches"
+  Write-Host -ForegroundColor cyan
+  Import-CSV -Path C:\users\$env:USERNAME\users.csv | foreach {
+          Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" -Recurse -Force -EA SilentlyContinue -Verbose
+  Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Microsoft\Windows\WER\*" -Recurse -Force -EA SilentlyContinue -Verbose
+  Remove-Item -path "C:\Users\$($_.Name)\AppData\Local\Temp\*" -Recurse -Force -EA SilentlyContinue -Verbose
+  Remove-Item -path "C:\Windows\Temp\*" -Recurse -Force -EA SilentlyContinue -Verbose
+  Remove-Item -path "C:\`$recycle.bin\" -Recurse -Force -EA SilentlyContinue -Verbose
+          }
+ 
+  Write-Host -ForegroundColor yellow "Done..."
+  ""
+  Write-Host -ForegroundColor Green "All Tasks Done!"
+  } else {
+Write-Host -ForegroundColor Yellow "Session Cancelled"      
+#Exit
+}
+
+
+
+
+
+
+
+
+
+
+#Check if the VMs have Zabbix or windefend up 
+
+#$service = "WinDefend"
+#$service = "Zabbix Agent"
+$IPCHost = get-content "C:\Tmp\servers1.txt" #this file was created with the list of VMs to check 
+foreach ($remoteComputer in $IPCHost) {
+    try {
+        Write-Host  -ForegroundColor Green "Processing computer: $remoteComputer"
+        Get-Service -ComputerName $remoteComputer | Where-Object { $_.name -eq $service }
+    } catch {
+        Write-Host "Error processing computer: $remoteComputer. Error details: $_"
+    }
+}
+#Set-Service -ComputerName  $Computer -Name $service -StartupType Demand -ErrorAction Stop	
+
