@@ -1,1 +1,27 @@
+#The basic and simple stuff but i want to log it 
+
+#This will help you find the service name and show you its status  
+Get-Service | Where-Object { $_.DisplayName -like "*Zabbix*" }
+
+#you can also just use this if you know the name of the service 
+Get-Service -Name "service name" 
+
+#Open disk managment in shell 
+diskmgmt
+
+#This was used when a service was stuck 
+Get-WmiObject -Class Win32_Service | Where-Object {$_.Name -eq "service name"} | Select-Object Name, ProcessId
+
+taskkill /F /PID "ProcessId given with the command above"
+
+#to do the above in one go 
+(Get-WmiObject -Class Win32_Service | Where-Object {$_.Name -eq "Nome do Serviço"}).ProcessID | ForEach-Object {Start-Process "taskkill" -ArgumentList "/f", "/pid", $_}
+
+You can log the any session of powershell the command will give you the path to where its gona save the .txt file  
+Start-Transcript
+Stop-Transcript
+
+Tcp port is open and reachable  
+Test-NetConnection -ComputerName "IP" -port PortYouWannaCheck -InformationLevel "Detailed"
+
 
