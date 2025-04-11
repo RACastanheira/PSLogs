@@ -1,35 +1,4 @@
-$vms = @("DZC03NT","HON14NT","HON24NT","HON25NT","SA84W052","SL05B935","SL09W722","SL16S541","SL44W248","SL59N179","SL72H566","SL73M986","SL82S339","SL97W996","SW01W689","SW02M263","SW02Q917","SW03B793","SW04R149","SW05C235","SW06J271","SW07E601","SW08N061","SW08P756","SW08R905","SW08W536","SW09U675","SW12G079","SW13Q184","SW23D872","SW31A754","SW34P937","SW58O951","SW60K482","SW73X698","SW81V793","SW85T933","SW85T933_old","SW89T687")  # List of VM names or IPs
-
-# Create a credential object using the current user's credentials
-$credential = New-Object System.Management.Automation.PSCredential ("$env:USERDOMAIN\$env:USERNAME", (Get-Credential -UserName "$env:USERDOMAIN\$env:USERNAME" -Message "Please enter your password").Password)
-
-foreach ($vm in $vms) {
-    # Run the remote command and capture the result
-    $result = Invoke-Command -ComputerName $vm -ScriptBlock {
-        $hostname = hostname
-        $ipconfig = ipconfig | Out-String  # Ensure the output is treated as a string
-       
-        # Ensure proper formatting with line breaks
-        return "Hostname: $hostname`n`n$ipconfig"  # Add a couple of newlines for spacing
-    } -Credential $credential
-
-    # Output the result for each VM
-    Write-Host "----------------------"
-    Write-Host "Result from $vm :"
-    Write-Host "----------------------"
-    Write-Host $result  # Now print the result with proper formatting
-    Write-Host "----------------------"
-    Write-Host ""  # Add an extra blank line for spacing between VM results
-}  
-
-
-
-
-
-
-
-
-#vamos testar assim temos so o ipv4 o catch e o ler as vms da lista 
+#vamos testar assim temos so o ipv4 o catch e o ler as vms da lista - this one worked
 
 # Import Excel module
 Import-Module ImportExcel
