@@ -94,18 +94,15 @@ if ($failedVMs.Count -gt 0) {
 
 
 
-
-
-
 # Read all VMs from text file
 $vms = Get-Content -Path "C:\Path\To\VMList.txt"
 
-# Define your Linux VMs (you can also detect based on name or IP pattern)
-$linuxVMs = @("linux1", "192.168.1.50")  # Add Linux VM hostnames or IPs here
+# Define Linux VMs
+$linuxVMs = @("linux1", "192.168.1.50")  # Update this list with your actual Linux VMs
 
 # Prompt for credentials
 $windowsCred = Get-Credential -Message "Enter credentials for Windows VMs"
-$linuxCred = Get-Credential -Message "Enter credentials for Linux VMs (SSH)"
+$linuxCred = Get-Credential -Message "Enter credentials for Linux VMs (SSH - password auth)"
 
 # Track failed connections
 $failedVMs = @()
@@ -113,18 +110,16 @@ $failedVMs = @()
 foreach ($vm in $vms) {
     if ($linuxVMs -contains $vm) {
         try {
-            # Use SSH for Linux VMs
-            $linuxUsername = $linuxCred.UserName
-            $linuxPassword = $linuxCred.GetNetworkCredential().Password
-
-            # Example using plink.exe (PuTTY), or replace with ssh.exe if available
-            $command = "hostname; ip -4 addr show | grep inet | grep -v 127.0.0.1"
-            $sshOutput = & ssh "$linuxUsername@$vm" $command
+            $result = Invoke-Command -HostName $vm -UserName $linuxCred.UserName -Password $linuxCred.GetNetworkCredential().Password -ScriptBlock {
+                $hostname = $(hostname)
+                $ipv4 = $(ip -4 addr show | grep inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1)
+                "Hostname: $hostname`nIPv4 Address(es): $ipv4"
+            }
 
             Write-Host "----------------------"
             Write-Host "Result from Linux VM $vm :"
             Write-Host "----------------------"
-            Write-Host $sshOutput
+            Write-Host $result
             Write-Host "----------------------`n"
         }
         catch {
@@ -134,7 +129,6 @@ foreach ($vm in $vms) {
     }
     else {
         try {
-            # Use WinRM for Windows VMs
             $result = Invoke-Command -ComputerName $vm -ScriptBlock {
                 $hostname = hostname
                 $ipv4 = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
