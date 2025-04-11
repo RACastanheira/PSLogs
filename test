@@ -94,64 +94,47 @@ if ($failedVMs.Count -gt 0) {
 
 
 
-# Read all VMs from text file
-$vms = Get-Content -Path "C:\Path\To\VMList.txt"
 
-# Define Linux VMs
-$linuxVMs = @("linux1", "192.168.1.50")  # Update this list with your actual Linux VMs
 
-# Prompt for credentials
-$windowsCred = Get-Credential -Message "Enter credentials for Windows VMs"
-$linuxCred = Get-Credential -Message "Enter credentials for Linux VMs (SSH - password auth)"
 
-# Track failed connections
+# Import the module
+Import-Module Posh-SSH
+
+# Read VM list
+$linuxVMs = Get-Content -Path "C:\Path\To\LinuxVMs.txt"
+
+# Prompt for SSH credentials
+$cred = Get-Credential -Message "Enter Linux SSH credentials"
+
+# Track failed VMs
 $failedVMs = @()
 
-foreach ($vm in $vms) {
-    if ($linuxVMs -contains $vm) {
-        try {
-            $result = Invoke-Command -HostName $vm -UserName $linuxCred.UserName -Password $linuxCred.GetNetworkCredential().Password -ScriptBlock {
-                $hostname = $(hostname)
-                $ipv4 = $(ip -4 addr show | grep inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1)
-                "Hostname: $hostname`nIPv4 Address(es): $ipv4"
-            }
+foreach ($vm in $linuxVMs) {
+    try {
+        # Create SSH session
+        $session = New-SSHSession -ComputerName $vm -Credential $cred -AcceptKey -ErrorAction Stop
 
-            Write-Host "----------------------"
-            Write-Host "Result from Linux VM $vm :"
-            Write-Host "----------------------"
-            Write-Host $result
-            Write-Host "----------------------`n"
-        }
-        catch {
-            Write-Warning "Could not retrieve info from Linux VM $vm"
-            $failedVMs += $vm
-        }
+        # Run remote commands
+        $hostname = Invoke-SSHCommand -SessionId $session.SessionId -Command "hostname"
+        $ipv4 = Invoke-SSHCommand -SessionId $session.SessionId -Command "ip -4 addr show | grep inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1"
+
+        # Output
+        Write-Host "----------------------------"
+        Write-Host "Result from $vm:"
+        Write-Host "Hostname: $($hostname.Output.Trim())"
+        Write-Host "IPv4 Address(es): $($ipv4.Output -join ', ' -replace '\s+', '')"
+        Write-Host "----------------------------`n"
+
+        # Close session
+        Remove-SSHSession -SessionId $session.SessionId
     }
-    else {
-        try {
-            $result = Invoke-Command -ComputerName $vm -ScriptBlock {
-                $hostname = hostname
-                $ipv4 = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-                    $_.IPAddress -ne "127.0.0.1" -and $_.InterfaceAlias -notmatch "Loopback"
-                }).IPAddress
-
-                return "Hostname: $hostname`nIPv4 Address(es): $($ipv4 -join ", ")"
-            } -Credential $windowsCred -ErrorAction Stop
-
-            Write-Host "----------------------"
-            Write-Host "Result from Windows VM $vm :"
-            Write-Host "----------------------"
-            Write-Host $result
-            Write-Host "----------------------`n"
-        }
-        catch {
-            Write-Warning "Could not retrieve info from Windows VM $vm"
-            $failedVMs += $vm
-        }
+    catch {
+        Write-Warning "Could not connect to $vm"
+        $failedVMs += $vm
     }
 }
 
-# Output failed VMs
+# Show failures
 if ($failedVMs.Count -gt 0) {
     Write-Host "`n======================="
     Write-Host "FAILED TO CONNECT TO:"
