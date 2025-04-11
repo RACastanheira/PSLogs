@@ -1,1 +1,208 @@
+#Show memory usage and the top 5 processes using it, can also be used for multiple VMs
+$remote_computer = Read-Host "Hostname ou Hostnames usar , " 
 
+$remote_computer = $remote_computer -split ','
+
+foreach ($computer in $remote_computer) {
+    Write-Host "Retrieving information for $computer..."
+    Write-Host "---------------"
+    try {
+        # Get Computer Object
+        $CompObject = Get-WmiObject -Class WIN32_OperatingSystem -ComputerName $computer -ErrorAction Stop
+        $MemoryFreePercentage = [math]::Round((($CompObject.FreePhysicalMemory / $CompObject.TotalVisibleMemorySize) * 100), 2)
+        Write-Host -ForegroundColor Green "Memory free in $computer in Percentage:" $MemoryFreePercentage "(%) of " ([math]::Round($CompObject.TotalVisibleMemorySize / 1MB, 2))"(GB)"
+        Write-Host "---------------"
+        # Top 5 Process Memory Usage (MB) with User
+        $processMemoryUsage = Get-WmiObject WIN32_PROCESS -ComputerName $computer -ErrorAction Stop | 
+        Sort-Object -Property WorkingSetSize -Descending | 
+        Select-Object -First 5 ProcessName, 
+        @{Name="Mem Usage(MB)"; Expression={[math]::Round($_.WorkingSetSize / 1MB, 2)}},
+        @{Name="User"; Expression={
+            $owner = $_.GetOwner()
+            "$($owner.Domain)\$($owner.User)"
+        }}
+        $processMemoryUsage | Format-Table -AutoSize
+    }
+    catch {
+        Write-Host -ForegroundColor Red "Failed to retrieve information for $computer. Error: $_"
+    }
+    Write-Host "******************"
+}
+
+
+
+
+
+
+
+
+
+
+
+#show you the Disk space of a VM
+param
+(
+	[Parameter(Position=0,mandatory=$true)]
+		[string]$CI 
+)
+ 
+Get-CimInstance -ComputerName $CI win32_logicaldisk | Select-Object -Property DeviceID, VolumeName, @{Label='FreeSpace (Gb)'
+expression={($_.FreeSpace/1GB).ToString('F2')}}, @{Label='Total (Gb)'
+expression={($_.Size/1GB).ToString('F2')}}, @{label='FreePercent'
+expression={[Math]::Round(($_.freespace / $_.size) * 100, 2)}}|ft
+
+
+
+
+
+
+
+
+
+#It starts a service on a VM without the need to Login into said VM
+param
+(
+        [Parameter(Position=0,mandatory=$true)]
+                [string]$CI,
+        [Parameter(Position=1,mandatory=$true)]
+                [string]$SERVICE
+)
+ 
+$svc=Get-Service -ComputerName $CI $SERVICE
+$svc
+ 
+$Host.UI.RawUI.ForegroundColor = "Yellow"
+echo "`nStarting service $SERVICE on CI $CI...`n"
+[Console]::ResetColor()
+ 
+$svc.Start()
+ 
+sleep(1)
+$svc=Get-Service -ComputerName $CI $SERVICE
+$svc
+
+
+
+
+
+
+
+
+
+#In this situation i had to confirm if the elements, e-mails, still belonged to any of our AD domamins  
+# Path to the CSV file with user data (make sure it has an 'Email' column)
+$csvFilePath = "C:\Users\myacc\test.csv"
+
+# Import the data from the CSV file
+$users = Import-Csv -Path $csvFilePath
+
+# List of Domain Controllers for each domain (add as many as you need)
+$domainControllers = @(
+    "domain1",
+    "domain2",
+    "domain3",
+    "domain4",
+    "domain5", 
+)
+
+
+# Create an array to hold results
+$results = @()
+
+# Loop through each user in the CSV file
+foreach ($user in $users) {
+    $email = $user.Email
+    $foundInAnyDomain = $false
+
+	
+    # Loop through each domain controller and search
+    foreach ($domainController in $domainControllers) {
+        # Query Active Directory in the current domain using the domain controller
+        try {
+            $adUser = Get-ADUser -Filter {mail -eq $email} -Properties mail -Server $domainController
+            if ($adUser) {
+                # Email found in the current domain
+                $foundInAnyDomain = $true
+                $results += [PSCustomObject]@{
+                    Email  = $adUser.mail
+                    Domain = $domainController
+                    Status = "Match"
+                }
+                break
+            }
+        } catch {
+            # Handle errors for unreachable domain controllers
+            Write-Warning "Could not query domain: $domainController"
+        }
+    }
+
+    # If not found in any domain
+    if (-not $foundInAnyDomain) {
+        $results += [PSCustomObject]@{
+            Email  = $email
+            Domain = "N/A"
+            Status = "Not Found in AD"
+        }
+    }
+}
+
+# Export the results to a CSV file
+# $results | Export-Csv -Path "C:\path\to\output_results.csv" -NoTypeInformation
+
+# Alternatively, display the results in the console
+$results | Format-Table -Property Email, Domain, Status
+
+
+
+
+
+
+
+
+
+#Here i had to identify to what WSUS server the VMs were in 
+
+$reportReg = @()
+$Computers = Get-Content C:\tmp\servers1.txt #this was the path to the file where i listed the VMs i needed to check
+Foreach ($Computer in $computers){
+    If(Test-Connection -ComputerName $Computer -Count 1 -ErrorAction 0){
+            Try{
+                # This is were the registry key is looked for on the remote server
+                $RegLine = "" | Select ComputerName, Ring, WUServer
+                $objReg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $Computer)
+                $objRegKey= $objReg.OpenSubKey("SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate")
+                $RegLine.ComputerName = $Computer
+                $RegLine.Ring = $objRegkey.GetValue("TargetGroup")
+                $RegLine.WUServer = $objRegkey.GetValue("WUServer")
+                $reportReg += $RegLine
+            }
+            Catch{
+                Write-Warning "Unable to reach $Computer, adding to bad list to look at later."
+                $Computer | Add-Content C:\tmp\wmf_erros.txt
+                Continue
+            }
+    }
+}
+$reportReg
+
+
+
+
+
+
+
+
+
+#I had to delete a specific folder from all the users in that VM
+#Folder to delete 
+$folderName = "\AppData\Roaming\Microsoft\Teams" #path to the folder 
+
+#Loop users in directory 
+get-Childitem "C:\Users" -Directory | ForEach-Object {
+	$userfolder = $_.FullName
+	$folderToDelete = Join-path $userFolder $folderName
+	if (Test-Path $folderToDelete) {
+		Remove-Item -Path $folderToDelete -Recurse -Force
+		Write-host "Deleted $folderName for user $($_.Name)"
+	}
+}
