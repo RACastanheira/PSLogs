@@ -1,40 +1,4 @@
-#tenho que verificar a versão do splunker 
-
-# Read VM names from a text file
-$vmList = Get-Content -Path "C:\path\to\vm_list.txt"  # Replace with your actual path
-
-# Prompt for credentials
-$credential = Get-Credential
-
-# Initialize results array
-$results = @()
-
-foreach ($vm in $vmList) {
-    $output = Invoke-Command -ComputerName $vm -Credential $credential -ScriptBlock {
-        $splunkExe = "C:\Program Files\Splunk\bin\splunk.exe"
-        if (Test-Path $splunkExe) {
-            $versionInfo = (Get-Item $splunkExe).VersionInfo
-            [PSCustomObject]@{
-                VMName = $env:COMPUTERNAME
-                SplunkVersion = $versionInfo.ProductVersion
-            }
-        } else {
-            [PSCustomObject]@{
-                VMName = $env:COMPUTERNAME
-                SplunkVersion = "Not Installed"
-            }
-        }
-    }
-    $results += $output
-}
-
-# Export results to CSV
-$results | Export-Csv -Path "C:\path\to\splunk_versions.csv" -NoTypeInformation
-
-
-
-
-#test 2
+#test 2 version that worked 
 
 # Load VM list from text file
 $vmList = Get-Content -Path "C:\path\to\vm_list.txt"  # Change to your actual path
