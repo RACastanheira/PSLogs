@@ -30,3 +30,55 @@ foreach ($vm in $vmList) {
 
 # Export results to CSV
 $results | Export-Csv -Path "C:\path\to\splunk_versions.csv" -NoTypeInformation
+
+
+
+
+#test 2
+
+# Load VM list from text file
+$vmList = Get-Content -Path "C:\path\to\vm_list.txt"  # Change to your actual path
+
+# Array to collect results
+$results = @()
+
+foreach ($vm in $vmList) {
+    try {
+        $output = Invoke-Command -ComputerName $vm -ScriptBlock {
+            $splunkExe = "C:\Program Files\Splunk\bin\splunk.exe"
+            if (Test-Path $splunkExe) {
+                $versionInfo = (Get-Item $splunkExe).VersionInfo
+                [PSCustomObject]@{
+                    VMName = $env:COMPUTERNAME
+                    SplunkVersion = $versionInfo.ProductVersion
+                    Status = "Installed"
+                }
+            } else {
+                [PSCustomObject]@{
+                    VMName = $env:COMPUTERNAME
+                    SplunkVersion = "N/A"
+                    Status = "Not Installed"
+                }
+            }
+        } -ErrorAction Stop
+
+        # Show result immediately
+        $output | Format-Table -AutoSize
+
+        # Save for export
+        $results += $output
+    }
+    catch {
+        # Handle unreachable VM or error
+        $results += [PSCustomObject]@{
+            VMName = $vm
+            SplunkVersion = "N/A"
+            Status = "Connection Failed"
+        }
+        Write-Host "❌ Could not connect to $vm" -ForegroundColor Red
+    }
+}
+
+# Export final results to CSV
+$results | Export-Csv -Path "C:\path\to\splunk_versions.csv" -NoTypeInformation
+Write-Host "✅ Results exported to splunk_versions.csv" -ForegroundColor Green
