@@ -1,4 +1,4 @@
-#test 2 version that worked 
+#test 2 find the splunker version this code is the one that worked 
 
 # Load VM list from text file
 $vmList = Get-Content -Path "C:\path\to\vm_list.txt"  # Change to your actual path
