@@ -1,48 +1,32 @@
-#vamos testar assim temos so o ipv4 o catch e o ler as vms da lista - this one worked
+#tenho que verificar a versão do splunker 
 
-# Read VMs from Excel
-$vms = Import-Excel -Path "C:\Path\To\VMList.xlsx" | Select-Object -ExpandProperty VMName
+# Read VM names from a text file
+$vmList = Get-Content -Path "C:\path\to\vm_list.txt"  # Replace with your actual path
 
-# Create a credential object
-$credential = New-Object System.Management.Automation.PSCredential (
-    "$env:USERDOMAIN\$env:USERNAME",
-    (Get-Credential -UserName "$env:USERDOMAIN\$env:USERNAME" -Message "Please enter your password").Password
-)
+# Prompt for credentials
+$credential = Get-Credential
 
-# To collect unreachable VMs
-$failedVMs = @()
+# Initialize results array
+$results = @()
 
-foreach ($vm in $vms) {
-    try {
-        $result = Invoke-Command -ComputerName $vm -ScriptBlock {
-            $hostname = hostname
-            $ipv4 = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-                $_.IPAddress -ne "127.0.0.1" -and $_.InterfaceAlias -notmatch "Loopback"
-            }).IPAddress
-
-            return "Hostname: $hostname`nIPv4 Address(es): $($ipv4 -join ", ")"
-        } -Credential $credential -ErrorAction Stop
-
-        Write-Host "----------------------"
-        Write-Host "Result from $vm :"
-        Write-Host "----------------------"
-        Write-Host $result
-        Write-Host "----------------------`n"
+foreach ($vm in $vmList) {
+    $output = Invoke-Command -ComputerName $vm -Credential $credential -ScriptBlock {
+        $splunkExe = "C:\Program Files\Splunk\bin\splunk.exe"
+        if (Test-Path $splunkExe) {
+            $versionInfo = (Get-Item $splunkExe).VersionInfo
+            [PSCustomObject]@{
+                VMName = $env:COMPUTERNAME
+                SplunkVersion = $versionInfo.ProductVersion
+            }
+        } else {
+            [PSCustomObject]@{
+                VMName = $env:COMPUTERNAME
+                SplunkVersion = "Not Installed"
+            }
+        }
     }
-    catch {
-        Write-Warning "Could not retrieve info from $vm"
-        $failedVMs += $vm
-    }
+    $results += $output
 }
 
-# Show list of failed VMs
-if ($failedVMs.Count -gt 0) {
-    Write-Host "`n======================="
-    Write-Host "FAILED TO CONNECT TO:"
-    Write-Host "======================="
-    $failedVMs | ForEach-Object { Write-Host $_ }
-}
-
-
-
-
+# Export results to CSV
+$results | Export-Csv -Path "C:\path\to\splunk_versions.csv" -NoTypeInformation
